@@ -1,0 +1,11 @@
+node_modules
+dist
+coverage
+.env
+firebase-adminsdk.json
+index.html
+
+.DS_Store
+
+Logs
+logs/*

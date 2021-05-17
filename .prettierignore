@@ -1,0 +1,6 @@
+.circleci
+node_modules
+build
+dist
+coverage
+temp

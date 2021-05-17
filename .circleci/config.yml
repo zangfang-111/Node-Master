@@ -1,0 +1,173 @@
+version: 2.1
+
+orbs:
+  aws-ecr: circleci/aws-ecr@4.0.1
+  aws-ecs: circleci/aws-ecs@0.0.7
+
+jobs:
+  build_and_test:
+    docker:
+      - image: circleci/node:latest
+    steps:
+      - checkout
+      - run:
+          name: Install Dependencies
+          command: npm install
+      - run:
+          name: Build
+          command: npm run build
+      - run:
+          name: Test
+          command: npm test
+
+workflows:
+  build_test:
+    jobs:
+      - build_and_test:
+          filters:
+            branches:
+              ignore:
+                - develop
+                - staging
+  build_test_dev_deploy:
+    jobs:
+      - build_and_test:
+          filters:
+            branches:
+              only:
+                - develop
+      - aws-ecr/build_and_push_image:
+          region: AWS_REGION
+          account-url: AWS_ECR_ACCOUNT_URL
+          repo: ${AWS_RESOURCE_NAME_PREFIX}
+          tag: ${CIRCLE_SHA1}
+          extra-build-args: --build-arg DB_HOST=${DEVELOPMENT_DB_HOST}
+            --build-arg DB_NAME=${DEVELOPMENT_DB_NAME}
+            --build-arg DB_USER=${DEVELOPMENT_DB_USER}
+            --build-arg DB_PASS=${DEVELOPMENT_DB_PASS}
+            --build-arg DB_PORT=${DB_PORT}
+            --build-arg FIREBASE_ACCOUNT_TYPE=${FIREBASE_ACCOUNT_TYPE}
+            --build-arg FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+            --build-arg FIREBASE_PRIVATE_KEY_ID=${FIREBASE_PRIVATE_KEY_ID}
+            --build-arg FIREBASE_PRIVATE_KEY="${FIREBASE_PRIVATE_KEY}"
+            --build-arg FIREBASE_CLIENT_EMAIL=${FIREBASE_CLIENT_EMAIL}
+            --build-arg FIREBASE_CLIENT_ID=${FIREBASE_CLIENT_ID}
+            --build-arg FIREBASE_AUTH_URI=${FIREBASE_AUTH_URI}
+            --build-arg FIREBASE_TOKEN_URI=${FIREBASE_TOKEN_URI}
+            --build-arg FIREBASE_AUTH_PROVIDER_X509_CERT_URL=${FIREBASE_AUTH_PROVIDER_X509_CERT_URL}
+            --build-arg FIREBASE_CLIENT_X509_CERT_URL=${FIREBASE_CLIENT_X509_CERT_URL}
+            --build-arg FIREBASE_DATABASE_URL=${FIREBASE_DATABASE_URL}
+            --build-arg FIREBASE_WEB_API_KEY=${FIREBASE_WEB_API_KEY}
+            --build-arg FIREBASE_WEB_AUTH_DOMAIN=${FIREBASE_WEB_AUTH_DOMAIN}
+            --build-arg FIREBASE_WEB_STORAGE_BUCKET=${FIREBASE_WEB_STORAGE_BUCKET}
+            --build-arg FIREBASE_WEB_MESSAGING_SENDER_ID=${FIREBASE_WEB_MESSAGING_SENDER_ID}
+            --build-arg FIREBASE_WEB_APP_ID=${FIREBASE_WEB_APP_ID}
+            --build-arg FIREBASE_WEB_MEASUREMENT_ID=${FIREBASE_WEB_MEASUREMENT_ID}
+            --build-arg TWILLIO_ACCOUNT_SID=${TWILLIO_ACCOUNT_SID}
+            --build-arg TWILLIO_AUTH_TOKEN=${TWILLIO_AUTH_TOKEN}
+            --build-arg TWILLIO_NUMBER=${TWILLIO_NUMBER}
+            --build-arg AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+            --build-arg AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+            --build-arg AWS_REGION=${AWS_REGION}
+            --build-arg AWS_BUCKET=${AWS_BUCKET}
+            --build-arg SIMPLEX_API_KEY=${SIMPLEX_API_KEY}
+            --build-arg SIMPLEX_PARTNER_NAME=${SIMPLEX_PARTNER_NAME}
+            --build-arg SIMPLEX_PARTNER_WEBSITE=${SIMPLEX_PARTNER_WEBSITE}
+            --build-arg SIMPLEX_HOST_URL=${SIMPLEX_HOST_URL}
+            --build-arg SENDGRID_API_KEY=${SENDGRID_API_KEY}
+            --build-arg SENDER_EMAIL=${SENDER_EMAIL}
+            --build-arg SENDGRID_EMAIL_VERIFICATION_TEMPLATE_ID=${SENDGRID_EMAIL_VERIFICATION_TEMPLATE_ID}
+            --build-arg SENDGRID_EMAIL_ADMIN_INVITATION_TEMPLATE_ID=${SENDGRID_EMAIL_ADMIN_INVITATION_TEMPLATE_ID}
+            --build-arg SENDGRID_EMAIL_RESET_PASSWORD_TEMPLATE_ID=${SENDGRID_EMAIL_RESET_PASSWORD_TEMPLATE_ID}
+            --build-arg SENDGRID_EMAIL_TRANSACTION_REQUEST_TEMPLATE_ID=${SENDGRID_EMAIL_TRANSACTION_REQUEST_TEMPLATE_ID}
+            --build-arg SENDGRID_EMAIL_TRANSACTION_APPROVE_TEMPLATE_ID=${SENDGRID_EMAIL_TRANSACTION_APPROVE_TEMPLATE_ID}
+            --build-arg BACK_OFFICE_BASE_URL=${BACK_OFFICE_BASE_URL_DEVELOPMENT}
+          requires:
+            - build_and_test
+          filters:
+            branches:
+              only:
+                - develop
+      - aws-ecs/deploy-service-update:
+          requires:
+            - aws-ecr/build_and_push_image
+          aws-region: ${AWS_REGION}
+          family: "${AWS_RESOURCE_NAME_PREFIX}-task"
+          service-name: "${AWS_RESOURCE_NAME_PREFIX}-service"
+          cluster-name: "${AWS_RESOURCE_NAME_PREFIX}-cluster"
+          container-image-name-updates: "container=${AWS_RESOURCE_NAME_PREFIX},tag=${CIRCLE_SHA1}"
+          filters:
+            branches:
+              only:
+                - develop
+  build_test_staging_deploy:
+    jobs:
+      - build_and_test:
+          filters:
+            branches:
+              only:
+                - staging
+      - aws-ecr/build_and_push_image:
+          region: AWS_REGION
+          account-url: AWS_ECR_ACCOUNT_URL
+          repo: ${STAGING_RESOURCE_NAME_PREFIX}
+          tag: ${CIRCLE_SHA1}
+          extra-build-args: --build-arg DB_HOST=${STAGING_DB_HOST}
+            --build-arg DB_NAME=${STAGING_DB_NAME}
+            --build-arg DB_USER=${STAGING_DB_USER}
+            --build-arg DB_PASS=${STAGING_DB_PASS}
+            --build-arg DB_PORT=${DB_PORT}
+            --build-arg FIREBASE_ACCOUNT_TYPE=${FIREBASE_ACCOUNT_TYPE}
+            --build-arg FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+            --build-arg FIREBASE_PRIVATE_KEY_ID=${FIREBASE_PRIVATE_KEY_ID}
+            --build-arg FIREBASE_PRIVATE_KEY="${FIREBASE_PRIVATE_KEY}"
+            --build-arg FIREBASE_CLIENT_EMAIL=${FIREBASE_CLIENT_EMAIL}
+            --build-arg FIREBASE_CLIENT_ID=${FIREBASE_CLIENT_ID}
+            --build-arg FIREBASE_AUTH_URI=${FIREBASE_AUTH_URI}
+            --build-arg FIREBASE_TOKEN_URI=${FIREBASE_TOKEN_URI}
+            --build-arg FIREBASE_AUTH_PROVIDER_X509_CERT_URL=${FIREBASE_AUTH_PROVIDER_X509_CERT_URL}
+            --build-arg FIREBASE_CLIENT_X509_CERT_URL=${FIREBASE_CLIENT_X509_CERT_URL}
+            --build-arg FIREBASE_DATABASE_URL=${FIREBASE_DATABASE_URL}
+            --build-arg FIREBASE_WEB_API_KEY=${FIREBASE_WEB_API_KEY}
+            --build-arg FIREBASE_WEB_AUTH_DOMAIN=${FIREBASE_WEB_AUTH_DOMAIN}
+            --build-arg FIREBASE_WEB_STORAGE_BUCKET=${FIREBASE_WEB_STORAGE_BUCKET}
+            --build-arg FIREBASE_WEB_MESSAGING_SENDER_ID=${FIREBASE_WEB_MESSAGING_SENDER_ID}
+            --build-arg FIREBASE_WEB_APP_ID=${FIREBASE_WEB_APP_ID}
+            --build-arg FIREBASE_WEB_MEASUREMENT_ID=${FIREBASE_WEB_MEASUREMENT_ID}
+            --build-arg TWILLIO_ACCOUNT_SID=${TWILLIO_ACCOUNT_SID}
+            --build-arg TWILLIO_AUTH_TOKEN=${TWILLIO_AUTH_TOKEN}
+            --build-arg TWILLIO_NUMBER=${TWILLIO_NUMBER}
+            --build-arg AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+            --build-arg AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+            --build-arg AWS_REGION=${AWS_REGION}
+            --build-arg AWS_BUCKET=${AWS_BUCKET}
+            --build-arg SIMPLEX_API_KEY=${STAGING_SIMPLEX_API_KEY}
+            --build-arg SIMPLEX_PARTNER_NAME=${SIMPLEX_PARTNER_NAME}
+            --build-arg SIMPLEX_PARTNER_WEBSITE=${SIMPLEX_PARTNER_WEBSITE}
+            --build-arg SIMPLEX_HOST_URL=${SIMPLEX_HOST_URL}
+            --build-arg SENDGRID_API_KEY=${SENDGRID_API_KEY}
+            --build-arg SENDER_EMAIL=${SENDER_EMAIL}
+            --build-arg SENDGRID_EMAIL_VERIFICATION_TEMPLATE_ID=${SENDGRID_EMAIL_VERIFICATION_TEMPLATE_ID}
+            --build-arg SENDGRID_EMAIL_ADMIN_INVITATION_TEMPLATE_ID=${SENDGRID_EMAIL_ADMIN_INVITATION_TEMPLATE_ID}
+            --build-arg SENDGRID_EMAIL_RESET_PASSWORD_TEMPLATE_ID=${SENDGRID_EMAIL_RESET_PASSWORD_TEMPLATE_ID}
+            --build-arg SENDGRID_EMAIL_TRANSACTION_REQUEST_TEMPLATE_ID=${SENDGRID_EMAIL_TRANSACTION_REQUEST_TEMPLATE_ID}
+            --build-arg SENDGRID_EMAIL_TRANSACTION_APPROVE_TEMPLATE_ID=${SENDGRID_EMAIL_TRANSACTION_APPROVE_TEMPLATE_ID}
+            --build-arg BACK_OFFICE_BASE_URL=${BACK_OFFICE_BASE_URL_STAGING}
+          requires:
+            - build_and_test
+          filters:
+            branches:
+              only:
+                - staging
+      - aws-ecs/deploy-service-update:
+          requires:
+            - aws-ecr/build_and_push_image
+          aws-region: ${AWS_REGION}
+          family: "${STAGING_RESOURCE_NAME_PREFIX}-task"
+          service-name: "${STAGING_RESOURCE_NAME_PREFIX}-service"
+          cluster-name: "${STAGING_RESOURCE_NAME_PREFIX}-cluster"
+          container-image-name-updates: "container=${STAGING_RESOURCE_NAME_PREFIX},tag=${CIRCLE_SHA1}"
+          filters:
+            branches:
+              only:
+                - staging
